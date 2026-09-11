@@ -22,11 +22,11 @@ def search_route(origin: str, destination: str, date_str: str):
         )
         result = get_flights(query)
         
-        if result:
+        if result and len(result) > 0:
             cheapest = min(result, key=lambda x: x.price)
             return {"price": cheapest.price, "success": True}
     except Exception as e:
-        print(f"Error consultando {origin} -> {destination}: {e}")
+        print(f"Aviso: Google bloqueó o no devolvió datos para {origin} -> {destination} ({e})")
         
     return {"price": 0, "success": False}
 
@@ -34,7 +34,7 @@ def evaluate_best_option(destination: str, date_str: str):
     print(f"\n--- Analizando ruta hacia {destination} para el día {date_str} ---")
     
     trad = search_route(ORIGIN, destination, date_str)
-    trad_price = trad["price"] if trad["success"] else 1500  # fallback de seguridad
+    trad_price = trad["price"] if trad["success"] else 1500
     print(f"Precio Ruta Tradicional ({ORIGIN} -> {destination}): ${trad_price}")
     
     best_interlining = None
@@ -58,7 +58,7 @@ def evaluate_best_option(destination: str, date_str: str):
             best_interlining = {"hub": hub, "price": total_price, "type": "virtual_interlining"}
 
     if not best_interlining:
-        print("No se pudieron calcular combinaciones de tramos separados.")
+        print("No se pudieron calcular combinaciones de tramos separados por bloqueos de red.")
         return {"type": "traditional", "price": trad_price}
         
     savings = (trad_price - min_interlining_price) / trad_price
