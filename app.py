@@ -14,14 +14,14 @@ with col1:
 with col2:
     base_date = st.date_input("Fecha Base de Salida", value=datetime.now() + timedelta(days=60))
 with col3:
-    flex_days = st.slider("Margen de flexibilidad (± días)", min_lbound=0, max_value=3, value=1)
+    flex_days = st.slider("Margen de flexibilidad (± días)", min_value=0, max_value=3, value=1)
 
 # Selección de duraciones de viaje
 st.markdown("**Duraciones de viaje preferidas (en días):**")
 duration_cols = st.columns(4)
 durations = []
 default_durations = [7, 10, 14, 20]
-for i, d in enumerate([7, 10, 14, 20]):
+for i, d in enumerate(default_durations):
     with duration_cols[i]:
         if st.checkbox(f"{d} días", value=True):
             durations.append(d)
@@ -67,17 +67,14 @@ if st.button("Escanear Fechas y Combinaciones", type="primary"):
         
         with st.spinner(f"Analizando rango del {start_search} al {end_search} para {destination}..."):
             
-            # Buscar ida tradicional en el rango
             outbound_options = search_flights_range("TLV", destination, start_search, end_search)
             
             st.divider()
             st.markdown("**Resultados y Alternativas Encontradas:**")
             
             if outbound_options:
-                # Ordenar por precio
                 outbound_options = sorted(outbound_options, key=lambda x: x["price"])
-                
-                for opt in outbound_options[:5]:  # Mostrar los 5 mejores precios del rango
+                for opt in outbound_options[:5]:
                     st.markdown(f"""
                     - **Fecha:** {opt['date']} | **Precio:** ${opt['price']} | **Aerolínea:** {opt['airline']}
                       * [Ver en Google Flights]({opt['link']})
@@ -85,7 +82,6 @@ if st.button("Escanear Fechas y Combinaciones", type="primary"):
             else:
                 st.warning("No se encontraron resultados directos en este rango con las restricciones actuales.")
 
-            # Evaluación de Tramos Separados por Hubs
             st.markdown("---")
             st.markdown("**Evaluación de Tramos Separados (Low Cost + Larga Distancia):**")
             
@@ -94,8 +90,8 @@ if st.button("Escanear Fechas y Combinaciones", type="primary"):
                 leg1_opt = search_flights_range("TLV", hub, start_search, end_search)
                 if leg1_opt:
                     best_leg1 = min(leg1_opt, key=lambda x: x["price"])
-                    # Buscar tramo 2 desde el hub el mismo día o siguiente
-                    leg2_opt = search_flights_range(hub, destination, datetime.strptime(best_leg1['date'], "%Y-%m-%d").date(), datetime.strptime(best_leg1['date'], "%Y-%m-%d").date() + timedelta(days=1))
+                    leg2_date = datetime.strptime(best_leg1['date'], "%Y-%m-%d").date()
+                    leg2_opt = search_flights_range(hub, destination, leg2_date, leg2_date + timedelta(days=1))
                     if leg2_opt:
                         best_leg2 = min(leg2_opt, key=lambda x: x["price"])
                         total_price = best_leg1["price"] + best_leg2["price"]
