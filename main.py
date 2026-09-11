@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from fast_flights import get_flights, FlightQuery, Passengers
+from fast_flights import get_flights, Passengers
 
 ORIGIN = "TLV"
 HUBS_EUROPE = ["BCN", "MAD", "FCO"]
@@ -9,17 +9,12 @@ SAVINGS_THRESHOLD_PERCENT = 0.35
 def search_route(origin: str, destination: str, date_str: str):
     try:
         result = get_flights(
-            flight_data=[
-                FlightQuery(
-                    date=date_str,
-                    from_airport=origin,
-                    to_airport=destination,
-                )
-            ],
-            trip="one-way",
-            seat="economy",
+            from_airport=origin,
+            to_airport=destination,
+            date=date_str,
             passengers=Passengers(adults=1),
-            fetch_mode="fallback"
+            seat="economy",
+            trip="one-way"
         )
         
         if result and result.flights:
