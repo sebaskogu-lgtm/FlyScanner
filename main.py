@@ -22,8 +22,8 @@ def search_route(origin: str, destination: str, date_str: str):
         )
         result = get_flights(query)
         
-        if result and result.flights:
-            cheapest = min(result.flights, key=lambda x: x.price)
+        if result:
+            cheapest = min(result, key=lambda x: x.price)
             return {"price": cheapest.price, "success": True}
     except Exception as e:
         print(f"Error consultando {origin} -> {destination}: {e}")
