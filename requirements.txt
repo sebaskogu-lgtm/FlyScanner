@@ -1,2 +1,3 @@
 fast-flights
 typing-extensions
+streamlit
