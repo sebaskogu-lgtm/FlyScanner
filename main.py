@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from fast_flights import get_flights, Passengers
+from fast_flights import FlightQuery, Passengers, create_query, get_flights
 
 ORIGIN = "TLV"
 HUBS_EUROPE = ["BCN", "MAD", "FCO"]
@@ -8,14 +8,19 @@ SAVINGS_THRESHOLD_PERCENT = 0.35
 
 def search_route(origin: str, destination: str, date_str: str):
     try:
-        result = get_flights(
-            from_airport=origin,
-            to_airport=destination,
-            date=date_str,
-            passengers=Passengers(adults=1),
+        query = create_query(
+            flights=[
+                FlightQuery(
+                    date=date_str,
+                    from_airport=origin,
+                    to_airport=destination,
+                )
+            ],
+            trip="one-way",
             seat="economy",
-            trip="one-way"
+            passengers=Passengers(adults=1)
         )
+        result = get_flights(query)
         
         if result and result.flights:
             cheapest = min(result.flights, key=lambda x: x.price)
