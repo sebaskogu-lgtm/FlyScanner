@@ -1,83 +1,91 @@
 from datetime import datetime, timedelta
-# Importación conceptual de la librería open-source para extraer Google Flights sin API de pago
-# pip install fast-flights
-from fast_flights import FlightData, Passengers, Result
+from fast_flights import get_flights, FlightQuery, Passengers
 
 # Configuración base
 ORIGIN = "TLV"
-HUBS_EUROPE = ["BCN", "MAD", "ROM"]  # BCN clave para LEVEL, MAD para Plus Ultra/World2Fly
+HUBS_EUROPE = ["BCN", "MAD", "FCO"]  # FCO (Roma), BCN, MAD
 MIN_CONNECTION_HOURS = 4
-SAVINGS_THRESHOLD_PERCENT = 0.35  # Exige al menos 35% de ahorro para arriesgar tickets separados
+SAVINGS_THRESHOLD_PERCENT = 0.35  # Exige al menos 35% de ahorro
 
-def search_traditional_route(destination: str, date_range: tuple):
+def search_route(origin: str, destination: str, date_str: str):
     """
-    Busca la ruta tradicional directa/una escala (ej. Ethiopian, ITA).
-    Devuelve el precio piso de seguridad.
+    Realiza la consulta real a Google Flights usando fast-flights v3.
     """
-    print(f"Buscando ruta tradicional {ORIGIN} -> {destination}...")
-    # Implementación con fast-flights para obtener el precio consolidado
-    # result = FlightData(origin=ORIGIN, destination=destination, date=date_range[0], ...)
-    # Retorna un diccionario con precio mínimo y aerolínea
-    return {"price": 1200, "airline": "Traditional", "type": "direct/single-ticket"}
+    try:
+        result = get_flights(
+            flight_data=[
+                FlightQuery(
+                    date=date_str,
+                    from_airport=origin,
+                    to_airport=destination,
+                )
+            ],
+            trip="one-way",
+            seat="economy",
+            passengers=Passengers(adults=1),
+            fetch_mode="fallback"
+        )
+        
+        if result and result.flights:
+            # Retorna el precio de la opción más económica encontrada
+            cheapest = min(result.flights, key=lambda x: x.price)
+            return {"price": cheapest.price, "success": True}
+    except Exception as e:
+        print(f"Error consultando {origin} -> {destination}: {e}")
+        
+    return {"price": 0, "success": False}
 
-def search_virtual_interlining(destination: str, hubs: list, date_range: tuple):
-    """
-    Busca la combinación de tramos separados:
-    Tramo 1: TLV -> Hub Europeo (Wizz Air / Ryanair)
-    Tramo 2: Hub Europeo -> Destino (LEVEL / Long-haul low cost)
-    """
-    combinations = []
+def evaluate_best_option(destination: str, date_str: str):
+    print(f"\n--- Analizando ruta hacia {destination} para el día {date_str} ---")
     
-    for hub in hubs:
-        print(f"Evaluando tramo 1: {ORIGIN} -> {hub}...")
-        # Simulación de extracción de vuelo corto
-        short_haul_price = 150  
-        short_haul_arrival_time = datetime.now() + timedelta(hours=4)
+    # 1. Buscar ruta tradicional directa o una escala
+    trad = search_route(ORIGIN, destination, date_str)
+    trad_price = trad["price"] if trad["success"] else 1500  fallback de seguridad
+    print(f"Precio Ruta Tradicional ({ORIGIN} -> {destination}): ${trad_price}")
+    
+    best_interlining = None
+    min_interlining_price = float('inf')
+    
+    # 2. Evaluar Tramos Separados vía Hubs Europeos
+    for hub in HUBS_EUROPE:
+        print(f"Evaluando escala en hub: {hub}...")
         
-        print(f"Evaluando tramo 2: {hub} -> {destination} (ej. LEVEL)...")
-        # Simulación de extracción de vuelo largo
-        long_haul_price = 650
-        long_haul_departure_time = short_haul_arrival_time + timedelta(hours=5) # 5 horas de escala
-        
-        # Filtro estricto de tiempo de escala
-        connection_time = (long_haul_departure_time - short_haul_arrival_time).total_seconds() / 3600
-        if connection_time < MIN_CONNECTION_HOURS:
-            continue # Descartar por riesgo de pérdida
+        # Tramo 1: TLV -> Hub europeo
+        leg1 = search_route(ORIGIN, hub, date_str)
+        if not leg1["success"]:
+            continue
             
-        total_price = short_haul_price + long_haul_price
-        combinations.append({
-            "hub": hub,
-            "price": total_price,
-            "type": "virtual_interlining",
-            "scale_hours": connection_time
-        })
+        # Tramo 2: Hub europeo -> Destino (asumiendo 1 día después o mismo día según conexión)
+        # Para simplificar el script de prueba, usamos la misma fecha o ajustamos
+        leg2 = search_route(hub, destination, date_str)
+        if not leg2["success"]:
+            continue
+            
+        total_price = leg1["price"] + leg2["price"]
+        print(f"  -> Via {hub}: Tramo1 (${leg1['price']}) + Tramo2 (${leg2['price']}) = Total: ${total_price}")
         
-    if not combinations:
-        return None
-    
-    # Retorna la opción más barata de interlining
-    return min(combinations, key=lambda x: x["price"])
+        if total_price < min_interlining_price:
+            min_interlining_price = total_price
+            best_interlining = {"hub": hub, "price": total_price, "type": "virtual_interlining"}
 
-def evaluate_best_option(destination: str, date_range: tuple):
-    traditional = search_traditional_route(destination, date_range)
-    interlining = search_virtual_interlining(destination, HUBS_EUROPE, date_range)
-    
-    if not interlining:
-        return traditional
+    if not best_interlining:
+        print("No se pudieron calcular combinaciones de tramos separados.")
+        return {"type": "traditional", "price": trad_price}
         
-    # Aplicar regla de umbral de ahorro
-    savings = (traditional["price"] - interlining["price"]) / traditional["price"]
+    # Aplicar regla de ahorro
+    savings = (trad_price - min_interlining_price) / trad_price
     
     if savings >= SAVINGS_THRESHOLD_PERCENT:
-        print(f"¡Alerta! Tramos separados rentables via {interlining['hub']}. Ahorro: {savings*100:.1f}%")
-        return interlining
+        print(f"¡Alerta! Tramos separados rentables via {best_interlining['hub']}. Ahorro: {savings*100:.1f}%")
+        return best_interlining
     else:
-        print("El ahorro no justifica el riesgo de tickets separados. Se elige ruta tradicional.")
-        return traditional
+        print(f"El ahorro ({savings*100:.1f}%) no justifica el riesgo. Se elige ruta tradicional.")
+        return {"type": "traditional", "price": trad_price}
 
-# Ejemplo de ejecución
 if __name__ == "__main__":
-    dest = "EZE" # o "TYO"
-    dates = ("2026-10-01", "2026-10-20")
-    best_deal = evaluate_best_option(dest, dates)
-    print("Resultado final:", best_deal)
+    # Prueba con una fecha futura de ejemplo (ej. a unos meses)
+    test_destination = "EZE" 
+    test_date = (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")
+    
+    best_deal = evaluate_best_option(test_destination, test_date)
+    print("Resultado final seleccionado:", best_deal)
