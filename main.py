@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta
 from fast_flights import FlightQuery, Passengers, create_query, get_flights
 
@@ -26,7 +27,7 @@ def search_route(origin: str, destination: str, date_str: str):
             cheapest = min(result, key=lambda x: x.price)
             return {"price": cheapest.price, "success": True}
     except Exception as e:
-        print(f"Aviso: Google bloqueó o no devolvió datos para {origin} -> {destination} ({e})")
+        print(f"Aviso: Google bloqueó o no devolvió datos para {origin} -> {destination}")
         
     return {"price": 0, "success": False}
 
@@ -58,7 +59,7 @@ def evaluate_best_option(destination: str, date_str: str):
             best_interlining = {"hub": hub, "price": total_price, "type": "virtual_interlining"}
 
     if not best_interlining:
-        print("No se pudieron calcular combinaciones de tramos separados por bloqueos de red.")
+        print("No se pudieron calcular combinaciones de tramos separados.")
         return {"type": "traditional", "price": trad_price}
         
     savings = (trad_price - min_interlining_price) / trad_price
@@ -67,11 +68,14 @@ def evaluate_best_option(destination: str, date_str: str):
         print(f"¡Alerta! Tramos separados rentables via {best_interlining['hub']}. Ahorro: {savings*100:.1f}%")
         return best_interlining
     else:
-        print(f"El ahorro ({savings*100:.1f}%) no justifica el riesgo. Se elige ruta tradicional.")
+        print(f"El ahorro ({savings*100:.1f}%) no justifica el riesgo.")
         return {"type": "traditional", "price": trad_price}
 
 if __name__ == "__main__":
     test_destination = "EZE" 
     test_date = (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")
-    best_deal = evaluate_best_option(test_destination, test_date)
-    print("Resultado final seleccionado:", best_deal)
+    
+    while True:
+        evaluate_best_option(test_destination, test_date)
+        print("\n[Worker] Esperando 12 horas para la siguiente verificación...")
+        time.sleep(43200)  # Duerme 12 horas (43200 segundos) para evitar bloqueos masivos de Google
