@@ -1,16 +1,12 @@
 from datetime import datetime, timedelta
 from fast_flights import get_flights, FlightQuery, Passengers
 
-# Configuración base
 ORIGIN = "TLV"
-HUBS_EUROPE = ["BCN", "MAD", "FCO"]  # FCO (Roma), BCN, MAD
+HUBS_EUROPE = ["BCN", "MAD", "FCO"]
 MIN_CONNECTION_HOURS = 4
-SAVINGS_THRESHOLD_PERCENT = 0.35  # Exige al menos 35% de ahorro
+SAVINGS_THRESHOLD_PERCENT = 0.35
 
 def search_route(origin: str, destination: str, date_str: str):
-    """
-    Realiza la consulta real a Google Flights usando fast-flights v3.
-    """
     try:
         result = get_flights(
             flight_data=[
@@ -27,7 +23,6 @@ def search_route(origin: str, destination: str, date_str: str):
         )
         
         if result and result.flights:
-            # Retorna el precio de la opción más económica encontrada
             cheapest = min(result.flights, key=lambda x: x.price)
             return {"price": cheapest.price, "success": True}
     except Exception as e:
@@ -38,25 +33,19 @@ def search_route(origin: str, destination: str, date_str: str):
 def evaluate_best_option(destination: str, date_str: str):
     print(f"\n--- Analizando ruta hacia {destination} para el día {date_str} ---")
     
-    # 1. Buscar ruta tradicional directa o una escala
     trad = search_route(ORIGIN, destination, date_str)
-    trad_price = trad["price"] if trad["success"] else 1500  fallback de seguridad
+    trad_price = trad["price"] if trad["success"] else 1500  # fallback de seguridad
     print(f"Precio Ruta Tradicional ({ORIGIN} -> {destination}): ${trad_price}")
     
     best_interlining = None
     min_interlining_price = float('inf')
     
-    # 2. Evaluar Tramos Separados vía Hubs Europeos
     for hub in HUBS_EUROPE:
         print(f"Evaluando escala en hub: {hub}...")
-        
-        # Tramo 1: TLV -> Hub europeo
         leg1 = search_route(ORIGIN, hub, date_str)
         if not leg1["success"]:
             continue
             
-        # Tramo 2: Hub europeo -> Destino (asumiendo 1 día después o mismo día según conexión)
-        # Para simplificar el script de prueba, usamos la misma fecha o ajustamos
         leg2 = search_route(hub, destination, date_str)
         if not leg2["success"]:
             continue
@@ -72,7 +61,6 @@ def evaluate_best_option(destination: str, date_str: str):
         print("No se pudieron calcular combinaciones de tramos separados.")
         return {"type": "traditional", "price": trad_price}
         
-    # Aplicar regla de ahorro
     savings = (trad_price - min_interlining_price) / trad_price
     
     if savings >= SAVINGS_THRESHOLD_PERCENT:
@@ -83,9 +71,7 @@ def evaluate_best_option(destination: str, date_str: str):
         return {"type": "traditional", "price": trad_price}
 
 if __name__ == "__main__":
-    # Prueba con una fecha futura de ejemplo (ej. a unos meses)
     test_destination = "EZE" 
     test_date = (datetime.now() + timedelta(days=60)).strftime("%Y-%m-%d")
-    
     best_deal = evaluate_best_option(test_destination, test_date)
     print("Resultado final seleccionado:", best_deal)
