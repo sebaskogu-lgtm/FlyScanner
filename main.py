@@ -1,7 +1,26 @@
+import os
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime, timedelta
 from fast_flights import FlightQuery, Passengers, create_query, get_flights
 
+# --- Servidor HTTP falso para satisfacer a Render ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Flight Scanner Worker is active")
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+# Levantar el servidor en segundo plano
+threading.Thread(target=run_web_server, daemon=True).start()
+
+# --- Lógica del Buscador de Vuelos ---
 ORIGIN = "TLV"
 HUBS_EUROPE = ["BCN", "MAD", "FCO"]
 MIN_CONNECTION_HOURS = 4
@@ -78,4 +97,4 @@ if __name__ == "__main__":
     while True:
         evaluate_best_option(test_destination, test_date)
         print("\n[Worker] Esperando 12 horas para la siguiente verificación...")
-        time.sleep(43200)  # Duerme 12 horas (43200 segundos) para evitar bloqueos masivos de Google
+        time.sleep(43200)
